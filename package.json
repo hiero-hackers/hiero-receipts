@@ -1,0 +1,50 @@
+{
+  "name": "hiero-receipts",
+  "version": "0.1.0",
+  "description": "Human-readable, provenance-stamped transaction receipts for Hedera — convenient (mirror) or verified (stream), your choice. Prototype.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "keywords": [
+    "hedera",
+    "hiero",
+    "receipt",
+    "mirror-node",
+    "notifications"
+  ],
+  "exports": {
+    ".": "./dist/index.js",
+    "./mirror": "./dist/adapters/mirror.js",
+    "./stream": "./dist/adapters/stream.js",
+    "./exchange-rate": "./dist/adapters/exchange-rate.js"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "prepare": "npm run build"
+  },
+  "peerDependencies": {
+    "@hiero-enterprise/mirror": "*",
+    "@hiero-streams/node": "*"
+  },
+  "peerDependenciesMeta": {
+    "@hiero-enterprise/mirror": {
+      "optional": true
+    },
+    "@hiero-streams/node": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@hiero-enterprise/mirror": "file:../hiero-enterprise-js/packages/mirror",
+    "fast-check": "^4.9.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
