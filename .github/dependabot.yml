@@ -9,8 +9,18 @@ updates:
       dependencies:
         patterns:
           - "*"
+    ignore:
+      # TypeScript majors are toolchain events, not routine bumps: the 7.x
+      # native compiler drops the JS API that typescript-eslint and typedoc
+      # load, so the major is adopted deliberately once they support it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
