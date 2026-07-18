@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/hiero-hackers/hiero-receipts/main/schema/receipt.v1.schema.json",
+  "title": "hiero-receipts Receipt (JSON rendering), v1",
+  "description": "The shape produced by toJSON(receipt). Every bigint is serialized as an exact decimal STRING (amounts can exceed 2^53); JSON numbers appear only where precision is safe (block numbers, signer counts). The schema is a contract: a breaking change to this shape bumps the version in the filename and $id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "account",
+    "payer",
+    "transactionId",
+    "consensusTimestamp",
+    "txType",
+    "status",
+    "direction",
+    "movements",
+    "feeTinybar",
+    "provenance"
+  ],
+  "properties": {
+    "account": { "type": "string", "minLength": 1 },
+    "payer": { "type": "string" },
+    "transactionId": { "type": "string", "minLength": 1 },
+    "consensusTimestamp": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Hedera consensus timestamp, seconds.nanos"
+    },
+    "txType": { "type": "string" },
+    "status": { "enum": ["success", "failed"] },
+    "direction": { "enum": ["in", "out", "internal", "none"] },
+    "counterparty": { "type": "string" },
+    "movements": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/movement" }
+    },
+    "nft": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nftMovement" }
+    },
+    "stakingRewardTinybar": { "$ref": "#/$defs/bigintString" },
+    "feeTinybar": { "$ref": "#/$defs/bigintString" },
+    "memo": { "type": "string" },
+    "fiat": { "$ref": "#/$defs/fiatValue" },
+    "feeFiat": { "$ref": "#/$defs/fiatValue" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "$defs": {
+    "bigintString": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$",
+      "description": "A bigint serialized as an exact decimal string"
+    },
+    "movement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset", "amount", "kind"],
+      "properties": {
+        "asset": { "type": "string", "description": "\"HBAR\" or a token id" },
+        "amount": { "$ref": "#/$defs/bigintString" },
+        "kind": { "enum": ["hbar", "token"] }
+      }
+    },
+    "nftMovement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tokenId", "serial", "direction"],
+      "properties": {
+        "tokenId": { "type": "string" },
+        "serial": { "$ref": "#/$defs/bigintString" },
+        "direction": { "enum": ["in", "out"] }
+      }
+    },
+    "fiatValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "amount", "source", "at"],
+      "properties": {
+        "currency": { "type": "string" },
+        "amount": {
+          "$ref": "#/$defs/bigintString",
+          "description": "Fiat minor units (e.g. cents), signed"
+        },
+        "source": { "type": "string" },
+        "at": { "type": "string" }
+      }
+    },
+    "provenance": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": { "const": "unverified" },
+            "source": { "enum": ["mirror", "stream"] },
+            "network": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "source", "block", "scheme"],
+          "properties": {
+            "kind": { "const": "verified" },
+            "source": { "const": "stream" },
+            "network": { "type": "string" },
+            "block": { "type": "integer", "minimum": 0 },
+            "scheme": { "type": "string" },
+            "signers": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          }
+        }
+      ]
+    }
+  }
+}

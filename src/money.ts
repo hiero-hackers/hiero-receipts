@@ -27,6 +27,9 @@ export function toBigInt(value: bigint | number | string): bigint {
  * split — never division into a float. `suffix` is appended as-is.
  */
 export function render(amount: bigint, decimals: number, suffix = ""): string {
+  if (!Number.isInteger(decimals) || decimals < 0) {
+    throw new RangeError(`decimals must be a non-negative integer, got ${decimals}`);
+  }
   if (decimals === 0) return `${amount}${suffix}`;
   const scale = 10n ** BigInt(decimals);
   const sign = amount < 0n ? "-" : "";
@@ -39,4 +42,35 @@ export function render(amount: bigint, decimals: number, suffix = ""): string {
 /** Render an HBAR amount (tinybar) as `ℏ`. */
 export function renderHbar(tinybar: bigint): string {
   return render(tinybar, HBAR_DECIMALS, " ℏ");
+}
+
+// One Intl lookup per locale, ever — the separator can't change at runtime.
+const DECIMAL_SEPARATORS = new Map<string, string>();
+function decimalSeparator(locale: string): string {
+  let sep = DECIMAL_SEPARATORS.get(locale);
+  if (!sep) {
+    sep =
+      new Intl.NumberFormat(locale).formatToParts(1.1).find((p) => p.type === "decimal")?.value ??
+      ".";
+    DECIMAL_SEPARATORS.set(locale, sep);
+  }
+  return sep;
+}
+
+/**
+ * {@link render} with the locale's decimal separator (`250,00000000` for
+ * `de-DE`). Digits stay ASCII, ungrouped, and exact — only the separator
+ * localizes, so the amount remains unambiguous and machine-parseable. For
+ * any locale whose separator is `.` this is byte-identical to `render`.
+ */
+export function renderLocalized(
+  amount: bigint,
+  decimals: number,
+  locale: string,
+  suffix = "",
+): string {
+  const plain = render(amount, decimals, suffix);
+  if (decimals === 0) return plain;
+  const sep = decimalSeparator(locale);
+  return sep === "." ? plain : plain.replace(".", sep);
 }

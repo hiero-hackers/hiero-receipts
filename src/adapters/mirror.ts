@@ -1,60 +1,91 @@
 /**
- * Mirror adapter — the primary source. Maps a mirror-node transaction (as
- * returned by `@hiero-enterprise/mirror`'s `MirrorNodeClient`) into a
- * `NormalizedTransaction`. Rich source: HBAR, tokens, NFTs, memo — but
- * `unverified` provenance (operator-attested, not cryptographically proven).
+ * Mirror adapter — the primary (convenient) source. Maps a mirror-node
+ * transaction as returned by `@hiero-hackers/enterprise-mirror`'s `MirrorNodeClient`
+ * (a `TransactionInfo`) into a `NormalizedTransaction`. Rich source: HBAR,
+ * tokens, NFTs, staking rewards, decoded memo — but `unverified` provenance
+ * (operator-attested, not cryptographically proven).
  *
  * The input is described structurally so this adapter needs no runtime
- * dependency on the mirror package — a real `MirrorTransaction` satisfies it.
+ * dependency on the mirror package — a real `TransactionInfo` satisfies it.
  */
-import type { NftLeg, NormalizedTransaction, TokenLeg } from "../normalized.js";
+import type { HbarLeg, Network, NftLeg, NormalizedTransaction, TokenLeg } from "../normalized.js";
 import { toBigInt } from "../money.js";
-import { hbarLegs, statusOf } from "./shared.js";
+import { statusOf } from "./shared.js";
 
-/** The subset of `@hiero-enterprise/mirror`'s `MirrorTransaction` we read. */
-export interface MirrorTransactionLike {
-  transaction_id: string;
+/** The subset of `@hiero-hackers/enterprise-mirror`'s `TransactionInfo` we read. */
+export interface TransactionInfoLike {
+  transactionId: string;
   name: string;
   result: string;
-  consensus_timestamp: string;
-  charged_tx_fee: number | string;
-  memo_base64?: string | null;
-  transfers: { account: string; amount: number | string }[];
-  token_transfers: { token_id: string; account: string; amount: number | string }[];
-  nft_transfers?: { token_id: string; serial_number: number | string; sender_account_id: string; receiver_account_id: string }[];
-  staking_reward_transfers?: { account: string; amount: number | string }[];
+  consensusTimestamp: string;
+  chargedTxFee: number | string;
+  memo?: string; // already decoded by the client
+  transfers: { accountId: string; amount: number | string }[];
+  tokenTransfers: { tokenId: string; accountId: string; amount: number | string }[];
+  nftTransfers?: {
+    tokenId: string;
+    serialNumber: number | string;
+    senderAccountId: string;
+    receiverAccountId: string;
+  }[];
+  stakingRewardTransfers?: { accountId: string; amount: number | string }[];
 }
 
-export function fromMirror(tx: MirrorTransactionLike): NormalizedTransaction {
-  const tokenTransfers: TokenLeg[] = tx.token_transfers.map((t) => ({
-    tokenId: t.token_id,
-    account: t.account,
+export interface FromMirrorOptions {
+  /**
+   * Which network this transaction came from — `"mainnet"`, `"testnet"`, …
+   *
+   * Pass it from the same config that constructed your mirror client. A mirror
+   * `TransactionInfo` doesn't carry a network and an account id doesn't imply
+   * one (`0.0.1234` exists on all of them), so this is the only chance to
+   * record it. Omit it and every downstream consumer has to be told separately.
+   */
+  readonly network?: Network;
+}
+
+export function fromMirror(
+  tx: TransactionInfoLike,
+  opts: FromMirrorOptions = {},
+): NormalizedTransaction {
+  const hbarTransfers: HbarLeg[] = tx.transfers.map((t) => ({
+    account: t.accountId,
     amount: toBigInt(t.amount),
   }));
-  const nftTransfers: NftLeg[] = (tx.nft_transfers ?? []).map((n) => ({
-    tokenId: n.token_id,
-    serial: toBigInt(n.serial_number),
-    sender: n.sender_account_id,
-    receiver: n.receiver_account_id,
+  const tokenTransfers: TokenLeg[] = tx.tokenTransfers.map((t) => ({
+    tokenId: t.tokenId,
+    account: t.accountId,
+    amount: toBigInt(t.amount),
   }));
-  const stakingRewards = hbarLegs(tx.staking_reward_transfers ?? []);
+  const nftTransfers: NftLeg[] = (tx.nftTransfers ?? []).map((n) => ({
+    tokenId: n.tokenId,
+    serial: toBigInt(n.serialNumber),
+    sender: n.senderAccountId,
+    receiver: n.receiverAccountId,
+  }));
+  const stakingRewards: HbarLeg[] = (tx.stakingRewardTransfers ?? []).map((s) => ({
+    account: s.accountId,
+    amount: toBigInt(s.amount),
+  }));
 
-  // The payer is the account in the transaction id (`0.0.x-secs-nanos`).
-  const payer = tx.transaction_id.split("-")[0] ?? "";
-  const memo = tx.memo_base64 ? Buffer.from(tx.memo_base64, "base64").toString("utf8") : undefined;
+  // The payer is the account that opens the transaction id ("0.0.x-secs-nanos").
+  const payer = tx.transactionId.match(/^\d+\.\d+\.\d+/)?.[0] ?? "";
 
   return {
-    transactionId: tx.transaction_id,
-    consensusTimestamp: tx.consensus_timestamp,
+    transactionId: tx.transactionId,
+    consensusTimestamp: tx.consensusTimestamp,
     txType: tx.name,
     status: statusOf(tx.result),
     payer,
-    feeTinybar: toBigInt(tx.charged_tx_fee),
-    hbarTransfers: hbarLegs(tx.transfers),
+    feeTinybar: toBigInt(tx.chargedTxFee),
+    hbarTransfers,
     tokenTransfers,
-    provenance: { kind: "unverified", source: "mirror" },
+    provenance: {
+      kind: "unverified",
+      source: "mirror",
+      ...(opts.network !== undefined ? { network: opts.network } : {}),
+    },
     ...(nftTransfers.length > 0 ? { nftTransfers } : {}),
     ...(stakingRewards.length > 0 ? { stakingRewards } : {}),
-    ...(memo ? { memo } : {}),
+    ...(tx.memo ? { memo: tx.memo } : {}),
   };
 }

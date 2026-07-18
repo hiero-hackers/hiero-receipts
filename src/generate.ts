@@ -39,8 +39,10 @@ export function receiptFor(
 
   const nft: NftMovement[] = [];
   for (const leg of tx.nftTransfers ?? []) {
-    if (leg.sender === account) nft.push({ tokenId: leg.tokenId, serial: leg.serial, direction: "out" });
-    else if (leg.receiver === account) nft.push({ tokenId: leg.tokenId, serial: leg.serial, direction: "in" });
+    if (leg.sender === account)
+      nft.push({ tokenId: leg.tokenId, serial: leg.serial, direction: "out" });
+    else if (leg.receiver === account)
+      nft.push({ tokenId: leg.tokenId, serial: leg.serial, direction: "in" });
   }
 
   // Staking reward the account received (a subset of its HBAR movement).
@@ -57,11 +59,16 @@ export function receiptFor(
   // cost, valued on its own). For the payer, `hbarNet` includes the fee, so
   // adding it back gives the amount transferred; for others it is a no-op.
   const transferred = hbarNet + feeTinybar;
-  const fiat = fiatFor(transferred, tx.consensusTimestamp, opts.prices);
-  const feeFiat = feeTinybar > 0n ? fiatFor(feeTinybar, tx.consensusTimestamp, opts.prices) : undefined;
+  // No HBAR actually moved (fee-only, or token-only) → no fiat entry at
+  // all: a "≈ 0.00 USD" valuation of nothing is noise, not information.
+  const fiat =
+    transferred === 0n ? undefined : fiatFor(transferred, tx.consensusTimestamp, opts.prices);
+  const feeFiat =
+    feeTinybar > 0n ? fiatFor(feeTinybar, tx.consensusTimestamp, opts.prices) : undefined;
 
   return {
     account,
+    payer: tx.payer,
     transactionId: tx.transactionId,
     consensusTimestamp: tx.consensusTimestamp,
     txType: tx.txType,
@@ -89,10 +96,14 @@ function deriveDirection(movements: readonly Movement[], nft: readonly NftMoveme
 }
 
 /**
- * The most likely counterparty (documented heuristic): if the account sent
- * HBAR, the largest positive leg among the *other* accounts; if it received,
- * the largest negative (most-outgoing) leg. `undefined` when there is no
- * other party (e.g. a fee-only transaction).
+ * The most likely counterparty (documented heuristic). HBAR legs are the
+ * best signal: if the account sent HBAR, the largest positive leg among the
+ * *other* accounts; if it received, the largest negative (most-outgoing)
+ * leg. For token-only transfers, the largest opposite-direction leg among
+ * the other accounts in a token this account moved (magnitudes of different
+ * tokens are compared raw — a heuristic, not an accounting identity). For
+ * NFT-only transfers, the other party on an NFT the account sent or
+ * received. `undefined` when there is no other party (e.g. fee-only).
  */
 function deriveCounterparty(
   account: string,
@@ -100,15 +111,51 @@ function deriveCounterparty(
   hbarNet: bigint,
 ): string | undefined {
   const others = tx.hbarTransfers.filter((leg) => leg.account !== account);
-  if (others.length === 0) return undefined;
-  const pick = others.reduce((best, leg) =>
-    hbarNet < 0n ? (leg.amount > best.amount ? leg : best) : (leg.amount < best.amount ? leg : best),
-  );
-  return pick.account;
+  if (others.length > 0) {
+    const pick = others.reduce((best, leg) =>
+      hbarNet < 0n
+        ? leg.amount > best.amount
+          ? leg
+          : best
+        : leg.amount < best.amount
+          ? leg
+          : best,
+    );
+    return pick.account;
+  }
+
+  // Token fallback: this account's net per token, then the biggest leg on
+  // the other side of one of those tokens.
+  const mine = new Map<string, bigint>();
+  for (const leg of tx.tokenTransfers) {
+    if (leg.account === account) mine.set(leg.tokenId, (mine.get(leg.tokenId) ?? 0n) + leg.amount);
+  }
+  let best: { account: string; magnitude: bigint } | undefined;
+  for (const leg of tx.tokenTransfers) {
+    if (leg.account === account) continue;
+    const net = mine.get(leg.tokenId);
+    if (net === undefined || net === 0n) continue;
+    const opposite = (net < 0n && leg.amount > 0n) || (net > 0n && leg.amount < 0n);
+    if (!opposite) continue;
+    const magnitude = leg.amount < 0n ? -leg.amount : leg.amount;
+    if (!best || magnitude > best.magnitude) best = { account: leg.account, magnitude };
+  }
+  if (best) return best.account;
+
+  // NFT fallback: the other party on an NFT this account sent or received.
+  for (const n of tx.nftTransfers ?? []) {
+    if (n.sender === account && n.receiver) return n.receiver;
+    if (n.receiver === account && n.sender) return n.sender;
+  }
+  return undefined;
 }
 
 /** Build the `FiatValue` for a tinybar amount via the price source, if given. */
-function fiatFor(tinybar: bigint, at: string, prices: PriceSource | undefined): FiatValue | undefined {
+function fiatFor(
+  tinybar: bigint,
+  at: string,
+  prices: PriceSource | undefined,
+): FiatValue | undefined {
   if (!prices) return undefined;
   const amount = prices.valueHbar(tinybar, at); // `at` = the tx's consensus timestamp
   if (amount === undefined) return undefined;

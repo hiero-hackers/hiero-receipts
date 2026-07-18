@@ -27,27 +27,37 @@ A reading order — each file only needs concepts from the ones before it.
 
 ## Presentation
 
-6. **`src/summary.ts`** — the plain-language layer: turns a `Receipt` into
-   human sentences ("You sent 250 ℏ to …") and a readable date, in one place
-   so text and HTML agree. This is where the wording lives.
-7. **`src/render/json.ts`** — canonical JSON (bigints → strings).
-8. **`src/render/text.ts`** / **`html.ts`** — plain-text and styled receipts,
+6. **`src/messages.ts`** — the `Messages` catalog: every sentence a receipt
+   can say, as typed functions (functions, not templates, because languages
+   reorder). The built-in English catalog `en` is the default wording.
+7. **`src/summary.ts`** — the assembly layer: turns a `Receipt` into
+   catalog-worded sentences ("You sent 250 ℏ to …"), detail rows, and the
+   memo defenses (sanitize, defang, warn), in one place so text and HTML
+   agree.
+8. **`src/render/json.ts`** — canonical JSON (bigints → strings), specified
+   by `schema/receipt.v1.schema.json`.
+9. **`src/render/text.ts`** / **`html.ts`** — plain-text and styled receipts,
    both driven by `summarize`.
+10. **`src/locales/de.ts`** / **`es.ts`** — the bundled translations, one
+    `Messages` catalog each, behind subpath imports so the core stays lean.
 
 ## The sources and fiat
 
-9. **`src/adapters/mirror.ts`** — `fromMirror`: the primary, rich, unverified
-   source (`@hiero-enterprise/mirror`).
-10. **`src/adapters/stream.ts`** — `fromStream`: the verified, leaner source
-    (`@hiero-streams/node`).
-11. **`src/adapters/exchange-rate.ts`** — `usdPriceFromExchangeRate`: a real
+11. **`src/adapters/mirror.ts`** — `fromMirror`: the primary, rich,
+    unverified source (`@hiero-hackers/enterprise-mirror`).
+12. **`src/adapters/stream.ts`** — `fromStream`: the verified, leaner source
+    (`@hiero-hackers/streams-node`).
+13. **`src/adapters/exchange-rate.ts`** — `usdPriceFromExchangeRate`: a real
     `PriceSource` from Hedera's on-chain exchange rate.
 
 ## Public surface & tests
 
-- **`src/index.ts`** — the core exports. Adapters are reached via subpaths
-  (`hiero-receipts/mirror`, `hiero-receipts/stream`) so the core stays
-  source-dependency-free.
+- **`src/index.ts`** — the core exports. Adapters and locales are reached
+  via subpaths (`@hiero-hackers/hiero-receipts/mirror`, `…/stream`,
+  `…/locales/de`) so the core stays source-dependency-free.
+- **`test/golden.test.ts`** — the whole pipeline pinned verbatim (English);
+  `test/i18n.test.ts` does the same in German. Wording changes show up here
+  as diffs a human signs off on.
 - **`test/generate.test.ts`** — `receiptFor` from both the sender's and
   receiver's viewpoint, fee attribution, fiat, and the mirror adapter.
 

@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { receiptFor, toText, toJSON } from "../src/index.js";
 import { fromMirror } from "../src/adapters/mirror.js";
-import { usdPriceFromExchangeRate, usdPriceFromExchangeRates } from "../src/adapters/exchange-rate.js";
+import { fromStream } from "../src/adapters/stream.js";
+import {
+  usdPriceFromExchangeRate,
+  usdPriceFromExchangeRates,
+} from "../src/adapters/exchange-rate.js";
 import type { NormalizedTransaction } from "../src/normalized.js";
 import type { PriceSource } from "../src/prices.js";
 
@@ -48,14 +52,34 @@ describe("receiptFor", () => {
 });
 
 describe("fiat valuation", () => {
+  it("emits no fiat entry when no HBAR moved — a \u2248 0.00 line is noise", () => {
+    const prices: PriceSource = { currency: "USD", source: "test", valueHbar: () => 0n };
+    // Fee-only for the payer: net HBAR movement equals the fee, nothing transferred.
+    const feeOnly: NormalizedTransaction = {
+      ...OUTGOING,
+      feeTinybar: 5n,
+      hbarTransfers: [{ account: "0.0.111", amount: -5n }],
+    };
+    const r = receiptFor("0.0.111", feeOnly, { prices });
+    expect(r.fiat).toBeUndefined();
+  });
+
   it("values HBAR exactly via a PriceSource", () => {
-    const prices: PriceSource = { currency: "USD", source: "test", valueHbar: (t) => (t * 5n) / 100_000_000n };
+    const prices: PriceSource = {
+      currency: "USD",
+      source: "test",
+      valueHbar: (t) => (t * 5n) / 100_000_000n,
+    };
     const r = receiptFor("0.0.222", OUTGOING, { prices });
     expect(r.fiat?.amount).toBe(5000n); // 1000 ℏ received * 5 cents
   });
 
   it("values the amount transferred (fee excluded) and states the fee's value separately", () => {
-    const prices: PriceSource = { currency: "USD", source: "test", valueHbar: (t) => (t * 5n) / 100_000_000n };
+    const prices: PriceSource = {
+      currency: "USD",
+      source: "test",
+      valueHbar: (t) => (t * 5n) / 100_000_000n,
+    };
     const r = receiptFor("0.0.111", OUTGOING, { prices }); // the payer
     expect(r.fiat?.amount).toBe(-5000n); // value of the 1000 ℏ sent, NOT 1000.01
     expect(r.feeFiat?.amount).toBe(0n); // the 0.01 ℏ fee is under a cent
@@ -108,19 +132,47 @@ describe("staking rewards", () => {
     expect(r.stakingRewardTinybar).toBe(1_250_000_000n);
     expect(toText(r)).toContain("You earned a staking reward of 12.50000000 ℏ");
   });
+
+  it("separates a reward paid IN THE SAME transaction from the amount received", () => {
+    // Receiving 100 ℏ triggers a 5 ℏ staking reward — both land on the account.
+    const tx: NormalizedTransaction = {
+      transactionId: "0.0.500@1783123300.0",
+      consensusTimestamp: "1783123300.000000000",
+      txType: "cryptoTransfer",
+      status: "success",
+      payer: "0.0.500",
+      feeTinybar: 0n,
+      hbarTransfers: [
+        { account: "0.0.500", amount: -10_000_000_000n }, // sender sends 100 ℏ
+        { account: "0.0.222", amount: 10_500_000_000n }, // receives 100 ℏ + 5 ℏ reward
+        { account: "0.0.800", amount: -500_000_000n }, // reward account pays the 5 ℏ
+      ],
+      tokenTransfers: [],
+      stakingRewards: [{ account: "0.0.222", amount: 500_000_000n }],
+      provenance: { kind: "unverified", source: "mirror" },
+    };
+    const r = receiptFor("0.0.222", tx);
+    expect(r.stakingRewardTinybar).toBe(500_000_000n);
+    const text = toText(r);
+    expect(text).toContain("You earned a staking reward of 5.00000000 ℏ");
+    expect(text).toContain("You received 100.00000000 ℏ from 0.0.500"); // reward excluded; sender is the counterparty
+  });
 });
 
-describe("fromMirror adapter", () => {
+describe("fromMirror adapter (@hiero-hackers/enterprise-mirror TransactionInfo)", () => {
   it("maps a mirror transaction into the normalized shape, incl. staking rewards", () => {
     const norm = fromMirror({
-      transaction_id: "0.0.5-1783123259-905485000",
+      transactionId: "0.0.5-1783123259-905485000",
       name: "cryptoTransfer",
       result: "SUCCESS",
-      consensus_timestamp: "1783123259.905485000",
-      charged_tx_fee: 1_000_000,
-      transfers: [{ account: "0.0.5", amount: -50 }, { account: "0.0.6", amount: 50 }],
-      token_transfers: [],
-      staking_reward_transfers: [{ account: "0.0.6", amount: 50 }],
+      consensusTimestamp: "1783123259.905485000",
+      chargedTxFee: 1_000_000,
+      transfers: [
+        { accountId: "0.0.5", amount: -50 },
+        { accountId: "0.0.6", amount: 50 },
+      ],
+      tokenTransfers: [],
+      stakingRewardTransfers: [{ accountId: "0.0.6", amount: 50 }],
     });
     expect(norm.payer).toBe("0.0.5");
     expect(norm.provenance).toEqual({ kind: "unverified", source: "mirror" });
@@ -129,5 +181,49 @@ describe("fromMirror adapter", () => {
 
   it("serializes bigints as strings in canonical JSON", () => {
     expect(toJSON(receiptFor("0.0.111", OUTGOING))).toContain('"amount": "-100001000000"');
+  });
+});
+
+describe("fromStream adapter (@hiero-hackers/streams-node verified path)", () => {
+  const parsed = {
+    consensusTimestamp: "1783200000.000000000",
+    payer: "0.0.5",
+    type: "cryptoTransfer",
+    result: "SUCCESS",
+    chargedFeeTinybar: 100,
+    transfers: [
+      { account: "0.0.5", amount: -50 },
+      { account: "0.0.6", amount: 50 },
+    ],
+    tokenTransfers: [],
+  };
+
+  it("stamps verified provenance (block, scheme, signers) when the proof is valid", () => {
+    const proof = {
+      blockNumber: 467,
+      proofPath: "aggregate-schnorr",
+      valid: true,
+      schnorr: { signerCount: 2, totalNodes: 3 },
+    };
+    const norm = fromStream(parsed, proof);
+    expect(norm.provenance).toEqual({
+      kind: "verified",
+      source: "stream",
+      block: 467,
+      scheme: "aggregate-Schnorr",
+      signers: [2, 3],
+    });
+    expect(toText(receiptFor("0.0.6", norm))).toContain(
+      "Cryptographically verified against the ledger (block 467)",
+    );
+  });
+
+  it("stays unverified — never claims a proof it did not get", () => {
+    expect(fromStream(parsed).provenance).toEqual({ kind: "unverified", source: "stream" });
+    const badProof = { blockNumber: 467, proofPath: "wraps-compressed-proof", valid: false };
+    expect(fromStream(parsed, badProof).provenance).toEqual({
+      kind: "unverified",
+      source: "stream",
+    });
   });
 });

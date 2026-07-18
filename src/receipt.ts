@@ -32,6 +32,8 @@ export type Direction = "in" | "out" | "internal" | "none";
  */
 export interface Receipt {
   readonly account: string;
+  /** The account that paid for (initiated) the transaction. */
+  readonly payer: string;
   readonly transactionId: string;
   readonly consensusTimestamp: string;
   readonly txType: string;

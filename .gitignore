@@ -2,8 +2,10 @@ node_modules/
 dist/
 *.tsbuildinfo
 coverage/
+docs-api/
 
 # Generated receipt output
+examples/output/
 *.receipt.html
 *.receipt.pdf
 

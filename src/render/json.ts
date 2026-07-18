@@ -5,5 +5,9 @@ import type { Receipt } from "../receipt.js";
  * JSON number would risk the very precision loss this library avoids).
  */
 export function toJSON(receipt: Receipt, space = 2): string {
-  return JSON.stringify(receipt, (_key, value) => (typeof value === "bigint" ? value.toString() : value), space);
+  return JSON.stringify(
+    receipt,
+    (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+    space,
+  );
 }

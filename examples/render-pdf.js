@@ -30,7 +30,9 @@ function findBrowser() {
       if (existsSync(candidate)) return candidate;
     } else {
       try {
-        execFileSync(process.platform === "win32" ? "where" : "which", [candidate], { stdio: "ignore" });
+        execFileSync(process.platform === "win32" ? "where" : "which", [candidate], {
+          stdio: "ignore",
+        });
         return candidate;
       } catch {
         /* not on PATH — keep looking */
@@ -56,7 +58,13 @@ export function htmlToPdf(html, outPath) {
   try {
     execFileSync(
       browser,
-      ["--headless", "--disable-gpu", "--no-pdf-header-footer", `--print-to-pdf=${outPath}`, `file://${htmlPath}`],
+      [
+        "--headless",
+        "--disable-gpu",
+        "--no-pdf-header-footer",
+        `--print-to-pdf=${outPath}`,
+        `file://${htmlPath}`,
+      ],
       { stdio: "ignore" },
     );
     return true;

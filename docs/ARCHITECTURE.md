@@ -35,18 +35,19 @@ core: hiero-receipts          NormalizedTransaction → Receipt → render   (ze
         ▲                            ▲
         │ fromMirror()               │ fromStream()
 hiero-receipts/mirror         hiero-receipts/stream          ← opt-in adapters (peerDeps)
-   └ @hiero-enterprise/mirror     └ @hiero-streams/node
+   └ @hiero-hackers/enterprise-mirror     └ @hiero-hackers/streams-node
 ```
 
-- **`hiero-receipts/mirror`** — the primary path. Maps
-  `@hiero-enterprise/mirror`'s `MirrorTransaction`. **Rich** (HBAR, tokens,
-  NFTs, memo, decimals available), **`unverified`** (operator-attested).
-- **`hiero-receipts/stream`** — the verified path (secondary). Maps
-  `@hiero-streams/node`'s parsed output plus a proof result. **`verified`**
+- **`@hiero-hackers/hiero-receipts/mirror`** — the primary path. Maps
+  `@hiero-hackers/enterprise-mirror`'s `TransactionInfo` (its `MirrorNodeClient`
+  output). **Rich** (HBAR, tokens, NFTs, staking rewards, decoded memo),
+  **`unverified`** (operator-attested).
+- **`@hiero-hackers/hiero-receipts/stream`** — the verified path (secondary). Maps
+  `@hiero-hackers/streams-node`'s parsed output plus a proof result. **`verified`**
   (recomputed root + threshold signature), but **leaner**.
 
 The core depends on *neither* source package — each adapter reads a
-structurally-typed subset, so a real `MirrorTransaction` / parsed object
+structurally-typed subset, so a real `TransactionInfo` / parsed object
 satisfies it without a hard dependency. The **caller** owns the client (the
 I/O) and hands plain objects to the adapter.
 
@@ -93,11 +94,13 @@ receipts*.)
 | `normalized.ts` | `NormalizedTransaction` — the source-agnostic input, and `Provenance`. |
 | `receipt.ts` | The `Receipt` data model. |
 | `generate.ts` | `receiptFor(account, tx)` — direction, counterparty, movements, fee, staking reward, fiat. |
-| `summary.ts` | Plain-language wording ("You sent 250 ℏ to 0.0.8891") + date formatting — shared by the text and HTML renderers so they stay consistent. |
-| `render/{json,text,html}.ts` | Presentations of a `Receipt` (JSON is machine-readable; text/HTML are plain-language). `toHTML` is self-contained and print-ready — a PDF is one headless-browser call away, in the caller. |
+| `summary.ts` | Assembles a `Receipt` into sentences and detail rows (worded by the catalog), plus the memo defenses and date formatting — shared by the text and HTML renderers so they stay consistent. |
+| `messages.ts` | The `Messages` catalog — every sentence, as typed functions (languages reorder; templates can't). English built-in. |
+| `locales/{de,es}.ts` | Bundled translations, one catalog each, behind subpath imports (`…/locales/de`). |
+| `render/{json,text,html}.ts` | Presentations of a `Receipt` (JSON is machine-readable, specified by `schema/receipt.v1.schema.json`; text/HTML are plain-language). `toHTML` is self-contained and print-ready — a PDF is one headless-browser call away, in the caller. |
 | `adapters/mirror.ts` | `fromMirror` — the primary, rich, unverified source (HBAR, tokens, NFTs, staking rewards, memo). |
 | `adapters/stream.ts` | `fromStream` — the verified, leaner source. |
-| `adapters/exchange-rate.ts` | `usdPriceFromExchangeRate(s)` — real `PriceSource`s from Hedera's **on-chain** exchange rate (via `@hiero-enterprise/mirror`), valued at the rate in effect at the transaction's timestamp. |
+| `adapters/exchange-rate.ts` | `usdPriceFromExchangeRate(s)` — real `PriceSource`s from Hedera's **on-chain** exchange rate (via `@hiero-hackers/enterprise-mirror`), valued at the rate in effect at the transaction's timestamp. |
 | `prices.ts` | `PriceSource` — pluggable, approximate fiat (exact rational valuation). |
 
 ## What's a fact, what's an estimate
@@ -142,7 +145,7 @@ report** (verified aggregate)
 `hiero-receipts` · · · · · · · · · · · · · · · · · · · · `hiero-journal`
 
 Both compose an existing lower layer instead of rebuilding it —
-`hiero-receipts` on `@hiero-enterprise/mirror` (and optionally
-`@hiero-streams/node`), `hiero-journal` on `hiero-streams`.
+`hiero-receipts` on `@hiero-hackers/enterprise-mirror` (and optionally
+`@hiero-hackers/streams-node`), `hiero-journal` on `hiero-streams`.
 
 See [CODE-TOUR.md](CODE-TOUR.md) for a reading order.

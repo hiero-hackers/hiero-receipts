@@ -1,44 +1,65 @@
 /**
  * Stream adapter — the verified source (secondary). Maps a parsed
- * transaction from `@hiero-streams/node` (`parseRecordFileJson` /
- * `parseBlockJson`, then `JSON.parse`) into a `NormalizedTransaction`,
- * stamped `verified` when accompanied by a proof result.
+ * transaction from `@hiero-hackers/streams-node` (`parseBlockJson` /
+ * `parseRecordFileJson`, then `JSON.parse`) into a `NormalizedTransaction`,
+ * stamped `verified` when accompanied by a valid proof from
+ * `verifyBlockProofJson`.
  *
  * Leaner than the mirror source: the canonical parsed shape carries HBAR and
- * fungible token legs, but not NFTs or memo (see docs/ARCHITECTURE.md — the
- * richness/proof trade-off). What it gives up in detail it gains in proof.
+ * fungible token legs, but not NFTs, memo, or staking-reward annotations (see
+ * docs/ARCHITECTURE.md — the richness/proof trade-off). What it gives up in
+ * detail it gains in proof.
+ *
+ * Shapes described structurally, so no runtime dependency on the binding.
  */
-import type { NormalizedTransaction, Provenance, TokenLeg } from "../normalized.js";
+import type { NormalizedTransaction, Network, Provenance, TokenLeg } from "../normalized.js";
 import { toBigInt } from "../money.js";
 import { hbarLegs, statusOf } from "./shared.js";
 
-/** The parsed-transaction shape emitted by `@hiero-streams/node` (JSON). */
+/** A parsed transaction as emitted by `@hiero-hackers/streams-node` (camelCase JSON). */
 export interface ParsedTransactionLike {
-  consensus_timestamp: string;
+  consensusTimestamp: string;
   payer: string;
   type: string;
   result: string;
-  charged_fee_tinybar: number | string;
+  chargedFeeTinybar: number | string;
   transfers: { account: string; amount: number | string }[];
-  token_transfers: { token: string; account: string; amount: number | string }[];
+  tokenTransfers: { token: string; account: string; amount: number | string }[];
 }
 
-/** The proof result shape from `@hiero-streams/node`'s `verifyBlockProofJson`. */
+/** A proof result from `@hiero-hackers/streams-node`'s `verifyBlockProofJson`. */
 export interface BlockProofLike {
-  block_number: number;
-  proof_scheme: string;
+  blockNumber: number;
+  /** "aggregate-schnorr" (genesis / pre-settled) or "wraps-compressed-proof". */
+  proofPath: string;
   valid: boolean;
-  signers?: [number, number];
+  schnorr?: { signerCount: number; totalNodes: number } | null;
 }
 
 /**
  * Build a normalized transaction from a parsed stream transaction. Pass the
- * block's verified `proof` to stamp `verified` provenance; omit it (or pass
- * an invalid proof) and the result is `unverified` — never claim a proof you
- * did not check.
+ * block's verified `proof` to stamp `verified` provenance; omit it (or pass an
+ * invalid proof) and the result is `unverified` — never claim a proof you did
+ * not check.
  */
-export function fromStream(tx: ParsedTransactionLike, proof?: BlockProofLike): NormalizedTransaction {
-  const tokenTransfers: TokenLeg[] = tx.token_transfers.map((t) => ({
+export interface FromStreamOptions {
+  /**
+   * Which network this block came from — `"mainnet"`, `"testnet"`, …
+   *
+   * Pass it from wherever you got the stream. A parsed transaction doesn't
+   * carry a network and an account id doesn't imply one, so this is the only
+   * chance to record it.
+   */
+  readonly network?: Network;
+}
+
+export function fromStream(
+  tx: ParsedTransactionLike,
+  proof?: BlockProofLike,
+  opts: FromStreamOptions = {},
+): NormalizedTransaction {
+  const network = opts.network !== undefined ? { network: opts.network } : {};
+  const tokenTransfers: TokenLeg[] = tx.tokenTransfers.map((t) => ({
     tokenId: t.token,
     account: t.account,
     amount: toBigInt(t.amount),
@@ -49,21 +70,31 @@ export function fromStream(tx: ParsedTransactionLike, proof?: BlockProofLike): N
       ? {
           kind: "verified",
           source: "stream",
-          block: proof.block_number,
-          scheme: proof.proof_scheme,
-          ...(proof.signers ? { signers: proof.signers } : {}),
+          ...network,
+          block: proof.blockNumber,
+          scheme: schemeLabel(proof.proofPath),
+          ...(proof.schnorr
+            ? { signers: [proof.schnorr.signerCount, proof.schnorr.totalNodes] }
+            : {}),
         }
-      : { kind: "unverified", source: "stream" }; // no valid proof ⇒ do not claim verification
+      : { kind: "unverified", source: "stream", ...network };
 
   return {
-    transactionId: `${tx.payer}@${tx.consensus_timestamp}`,
-    consensusTimestamp: tx.consensus_timestamp,
+    transactionId: `${tx.payer}@${tx.consensusTimestamp}`,
+    consensusTimestamp: tx.consensusTimestamp,
     txType: tx.type,
     status: statusOf(tx.result),
     payer: tx.payer,
-    feeTinybar: toBigInt(tx.charged_fee_tinybar),
+    feeTinybar: toBigInt(tx.chargedFeeTinybar),
     hbarTransfers: hbarLegs(tx.transfers),
     tokenTransfers,
     provenance,
   };
+}
+
+/** The `proofPath` slug → a human-readable scheme name for the receipt. */
+function schemeLabel(proofPath: string): string {
+  if (proofPath.startsWith("wraps")) return "WRAPS";
+  if (proofPath.startsWith("aggregate")) return "aggregate-Schnorr";
+  return proofPath;
 }

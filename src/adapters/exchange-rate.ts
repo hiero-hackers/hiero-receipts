@@ -17,7 +17,7 @@ import type { PriceSource } from "../prices.js";
 import { TINYBAR_PER_HBAR } from "../money.js";
 
 /**
- * The rate shape from `@hiero-enterprise/mirror`'s `ExchangeRate`
+ * The rate shape from `@hiero-hackers/enterprise-mirror`'s `ExchangeRate`
  * (`centEquivalent` cents == `hbarEquivalent` HBAR, valid until
  * `expirationTime`). Described structurally — no runtime dependency.
  */
@@ -54,8 +54,13 @@ export function usdPriceFromExchangeRate(rate: ExchangeRateLike): PriceSource {
  * A time-aware USD `PriceSource` over several rate windows. Each Hedera rate
  * is valid until its `expirationTime`; the rate covering timestamp `at` is
  * the one with the smallest expiration still after `at`. Returns `undefined`
- * when no loaded rate covers that time — so a receipt is never valued with a
- * wrong-period rate.
+ * when `at` is after every loaded window.
+ *
+ * One honest limit: the wire carries an expiry but no validity *start*, so
+ * an `at` **earlier** than the earliest window's real period cannot be
+ * detected — it would be valued with that earliest rate. Contiguous windows
+ * guard each other (each starts where its predecessor expires); load a set
+ * that brackets your transactions, oldest first included.
  */
 export function usdPriceFromExchangeRates(rates: readonly ExchangeRateLike[]): PriceSource {
   const windows = rates

@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Typecheck, lint, test, build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # The library and its tests have no runtime dependencies and don't need
+      # @hiero-hackers/enterprise-mirror or @hiero-hackers/streams-node (adapters read
+      # those shapes structurally) — only the examples do; those are covered
+      # by the `examples` job below.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run test:coverage
+      - run: npm run build
+      # The published artifact, not just the repo: exports/types resolution
+      # (publint + arethetypeswrong), then install the packed tarball into a
+      # scratch project and build a receipt through it.
+      - run: npm run lint:package
+      - run: npm run test:pack
+
+  examples:
+    name: Examples typecheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+
+      - run: npm ci
+
+      # Installs the peer packages from GitHub Packages so the examples
+      # typecheck against the REAL upstream types — this is the drift alarm
+      # for the enterprise/streams APIs. (If this step 401s, grant this repo
+      # read access to the packages: package settings → Manage Actions
+      # access.)
+      - run: npm run examples:setup
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: npm run typecheck:examples
+
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Every commit carries a Signed-off-by trailer
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=0
+          for sha in $(git rev-list --no-merges "$BASE".."$HEAD"); do
+            if ! git show -s --format=%B "$sha" | grep -q '^Signed-off-by: '; then
+              echo "::error::commit $sha lacks a Signed-off-by trailer (git commit -s)"
+              missing=1
+            fi
+          done
+          exit $missing

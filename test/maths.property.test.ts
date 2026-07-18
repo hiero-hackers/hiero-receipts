@@ -18,16 +18,21 @@ function parseRendered(s: string, decimals: number): bigint {
   const neg = s.startsWith("-");
   const body = (neg ? s.slice(1) : s).trim();
   const [whole, frac = ""] = body.split(".");
-  const scaled = BigInt(whole ?? "0") * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, "0") || "0");
+  const scaled =
+    BigInt(whole ?? "0") * 10n ** BigInt(decimals) + BigInt(frac.padEnd(decimals, "0") || "0");
   return neg ? -scaled : scaled;
 }
 
 describe("FACT: exact formatting (no float, round-trips)", () => {
   it("render() is a lossless integer split for any amount and scale", () => {
     fc.assert(
-      fc.property(fc.bigInt({ min: -(10n ** 30n), max: 10n ** 30n }), fc.integer({ min: 0, max: 18 }), (amount, decimals) => {
-        expect(parseRendered(render(amount, decimals), decimals)).toBe(amount);
-      }),
+      fc.property(
+        fc.bigInt({ min: -(10n ** 30n), max: 10n ** 30n }),
+        fc.integer({ min: 0, max: 18 }),
+        (amount, decimals) => {
+          expect(parseRendered(render(amount, decimals), decimals)).toBe(amount);
+        },
+      ),
     );
   });
 
@@ -90,11 +95,15 @@ describe("FACT: exchange-rate valuation is exact and monotonic", () => {
 
   it("never decreases as the amount grows (a positive rate)", () => {
     fc.assert(
-      fc.property(fc.bigInt({ min: 0n, max: 10n ** 18n }), fc.bigInt({ min: 0n, max: 10n ** 18n }), (a, b) => {
-        const lo = a < b ? a : b;
-        const hi = a < b ? b : a;
-        expect(prices.valueHbar(lo, "1.0")! <= prices.valueHbar(hi, "1.0")!).toBe(true);
-      }),
+      fc.property(
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        fc.bigInt({ min: 0n, max: 10n ** 18n }),
+        (a, b) => {
+          const lo = a < b ? a : b;
+          const hi = a < b ? b : a;
+          expect(prices.valueHbar(lo, "1.0")! <= prices.valueHbar(hi, "1.0")!).toBe(true);
+        },
+      ),
     );
   });
 

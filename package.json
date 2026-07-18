@@ -1,9 +1,22 @@
 {
-  "name": "hiero-receipts",
+  "name": "@hiero-hackers/hiero-receipts",
   "version": "0.1.0",
   "description": "Human-readable, provenance-stamped transaction receipts for Hedera — convenient (mirror) or verified (stream), your choice. Prototype.",
   "type": "module",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hiero-hackers/hiero-receipts.git"
+  },
+  "bugs": "https://github.com/hiero-hackers/hiero-receipts/issues",
+  "homepage": "https://github.com/hiero-hackers/hiero-receipts#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "keywords": [
     "hedera",
     "hiero",
@@ -11,40 +24,86 @@
     "mirror-node",
     "notifications"
   ],
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./mirror": "./dist/adapters/mirror.js",
-    "./stream": "./dist/adapters/stream.js",
-    "./exchange-rate": "./dist/adapters/exchange-rate.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./mirror": {
+      "types": "./dist/adapters/mirror.d.ts",
+      "default": "./dist/adapters/mirror.js"
+    },
+    "./stream": {
+      "types": "./dist/adapters/stream.d.ts",
+      "default": "./dist/adapters/stream.js"
+    },
+    "./exchange-rate": {
+      "types": "./dist/adapters/exchange-rate.d.ts",
+      "default": "./dist/adapters/exchange-rate.js"
+    },
+    "./locales/de": {
+      "types": "./dist/locales/de.d.ts",
+      "default": "./dist/locales/de.js"
+    },
+    "./locales/es": {
+      "types": "./dist/locales/es.d.ts",
+      "default": "./dist/locales/es.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
     "docs",
+    "schema",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:examples": "tsc -p tsconfig.examples.json",
     "test": "vitest run",
-    "prepare": "npm run build"
+    "test:coverage": "vitest run --coverage",
+    "test:pack": "node scripts/pack-smoke.mjs",
+    "lint:package": "publint && attw --pack --profile esm-only .",
+    "prepare": "npm run build",
+    "examples:setup": "node examples/setup.js",
+    "docs": "typedoc",
+    "lint": "eslint src test examples scripts",
+    "lint:fix": "eslint src test examples scripts --fix",
+    "format": "prettier --write src test examples scripts *.md",
+    "format:check": "prettier --check src test examples scripts *.md"
   },
   "peerDependencies": {
-    "@hiero-enterprise/mirror": "*",
-    "@hiero-streams/node": "*"
+    "@hiero-hackers/enterprise-mirror": "^0.1.0",
+    "@hiero-hackers/streams-node": "^0.1.0"
   },
   "peerDependenciesMeta": {
-    "@hiero-enterprise/mirror": {
+    "@hiero-hackers/enterprise-mirror": {
       "optional": true
     },
-    "@hiero-streams/node": {
+    "@hiero-hackers/streams-node": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@hiero-enterprise/mirror": "file:../hiero-enterprise-js/packages/mirror",
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.1",
+    "@vitest/coverage-v8": "^4.1.10",
+    "ajv": "^8.20.0",
+    "eslint": "^10.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-security": "^4.0.1",
     "fast-check": "^4.9.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.5",
+    "publint": "^0.3.21",
+    "typedoc": "^0.28.20",
     "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "typescript-eslint": "^8.64.0",
+    "vitest": "^4.0.0"
   }
 }

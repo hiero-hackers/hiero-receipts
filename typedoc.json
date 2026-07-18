@@ -1,0 +1,20 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/adapters/mirror.ts",
+    "src/adapters/stream.ts",
+    "src/adapters/exchange-rate.ts",
+    "src/locales/de.ts",
+    "src/locales/es.ts"
+  ],
+  "out": "docs-api",
+  "sourceLinkTemplate": "https://github.com/hiero-hackers/hiero-receipts/blob/main/{path}#L{line}",
+  "includeVersion": true,
+  "excludeInternal": true,
+  "readme": "README.md",
+  "navigationLinks": {
+    "GitHub": "https://github.com/hiero-hackers/hiero-receipts"
+  },
+  "treatWarningsAsErrors": true
+}
