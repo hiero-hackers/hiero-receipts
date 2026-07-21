@@ -1,6 +1,6 @@
 {
   "name": "@hiero-hackers/hiero-receipts",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Human-readable, provenance-stamped transaction receipts for Hedera \u2014 convenient (mirror) or verified (stream), your choice. Prototype.",
   "type": "module",
   "license": "Apache-2.0",

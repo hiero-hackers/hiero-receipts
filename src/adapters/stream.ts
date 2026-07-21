@@ -20,6 +20,10 @@ import { hbarLegs, statusOf } from "./shared.js";
 export interface ParsedTransactionLike {
   consensusTimestamp: string;
   payer: string;
+  /** The true id, `payer@validStart` (streams-node ≥ 0.2.0). Absent or ""
+   *  on older parses — the adapter then falls back to synthesizing
+   *  `payer@consensusTimestamp` and says so below. */
+  transactionId?: string;
   type: string;
   result: string;
   chargedFeeTinybar: number | string;
@@ -80,7 +84,13 @@ export function fromStream(
       : { kind: "unverified", source: "stream", ...network };
 
   return {
-    transactionId: `${tx.payer}@${tx.consensusTimestamp}`,
+    // The true validStart-based id when the parser provides it
+    // (streams-node ≥ 0.2.0); otherwise the historical synthesis — close
+    // enough to correlate, but not the id wallets and explorers spell.
+    transactionId:
+      tx.transactionId !== undefined && tx.transactionId !== ""
+        ? tx.transactionId
+        : `${tx.payer}@${tx.consensusTimestamp}`,
     consensusTimestamp: tx.consensusTimestamp,
     txType: tx.type,
     status: statusOf(tx.result),

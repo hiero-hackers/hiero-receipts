@@ -218,6 +218,18 @@ describe("fromStream adapter (@hiero-hackers/streams-node verified path)", () =>
     );
   });
 
+  it("uses the parser's true validStart id when present, synthesizes otherwise", () => {
+    // streams-node >= 0.2.0 provides the real id — validStart, not consensus.
+    const withId = { ...parsed, transactionId: "0.0.5@1783199940.000000007" };
+    expect(fromStream(withId).transactionId).toBe("0.0.5@1783199940.000000007");
+    // Older parses (or "" — the parser's own absent convention) fall back,
+    // and the synthesis is visibly consensus-based.
+    expect(fromStream(parsed).transactionId).toBe("0.0.5@1783200000.000000000");
+    expect(fromStream({ ...parsed, transactionId: "" }).transactionId).toBe(
+      "0.0.5@1783200000.000000000",
+    );
+  });
+
   it("stays unverified — never claims a proof it did not get", () => {
     expect(fromStream(parsed).provenance).toEqual({ kind: "unverified", source: "stream" });
     const badProof = { blockNumber: 467, proofPath: "wraps-compressed-proof", valid: false };
