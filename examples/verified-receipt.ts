@@ -16,16 +16,17 @@
  *
  *   node examples/verified-receipt.ts       (Node 23.6+ runs .ts directly)
  *
- * First: `npm run build && npm run examples:setup` (built library from
- * dist/, peer packages from GitHub Packages).
+ * First: `npm run build && npm run examples:setup`. The imports use the
+ * package's real name (Node self-reference) — copy-paste-ready for your own
+ * project.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseBlockJson, verifyBlockProofJson } from "@hiero-hackers/streams-node";
-import { receiptFor, toText, toHTML } from "../dist/index.js";
-import { fromStream } from "../dist/adapters/stream.js";
-import type { BlockProofLike, ParsedTransactionLike } from "../dist/adapters/stream.js";
+import { receiptFor, toText, toHTML } from "@hiero-hackers/hiero-receipts";
+import { fromStream } from "@hiero-hackers/hiero-receipts/stream";
+import type { BlockProofLike, ParsedTransactionLike } from "@hiero-hackers/hiero-receipts/stream";
 import { htmlToPdf } from "./render-pdf.js";
 
 const fixture = (name: string): Buffer =>

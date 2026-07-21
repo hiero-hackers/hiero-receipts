@@ -26,6 +26,22 @@ export default defineConfig(
     plugins: { prettier: prettierPlugin },
     rules: {
       "prettier/prettier": "error",
+      // Underscore prefix = deliberately unused (mock signatures, discarded
+      // destructures) — the TS convention the default rule doesn't know.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+
+  // Tests read and write their own fixtures by constructed paths — the
+  // non-literal-fs rule exists for request-driven server code, not for a
+  // test harness addressing its own files.
+  {
+    files: ["test/**"],
+    rules: {
+      "security/detect-non-literal-fs-filename": "off",
     },
   },
 

@@ -1,7 +1,7 @@
 {
   "name": "@hiero-hackers/hiero-receipts",
-  "version": "0.1.0",
-  "description": "Human-readable, provenance-stamped transaction receipts for Hedera — convenient (mirror) or verified (stream), your choice. Prototype.",
+  "version": "0.2.0",
+  "description": "Human-readable, provenance-stamped transaction receipts for Hedera \u2014 convenient (mirror) or verified (stream), your choice. Prototype.",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
@@ -33,6 +33,10 @@
     "./mirror": {
       "types": "./dist/adapters/mirror.d.ts",
       "default": "./dist/adapters/mirror.js"
+    },
+    "./mirror-fetch": {
+      "types": "./dist/adapters/mirror-fetch.d.ts",
+      "default": "./dist/adapters/mirror-fetch.js"
     },
     "./stream": {
       "types": "./dist/adapters/stream.d.ts",

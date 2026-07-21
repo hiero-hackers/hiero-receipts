@@ -54,6 +54,13 @@ The **core depends on neither source package** — each adapter is opt-in
 client (the I/O). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
 richness-vs-proof trade-off between the two sources.
 
+No client at all? For page-sized consumers there's also
+`@hiero-hackers/hiero-receipts/mirror-fetch` — the thin fetch half of the
+mirror path (transaction by id, recent transactions, token decimals) over
+standard `fetch`, browser-clean, mapped straight into what `fromMirror`
+accepts. Three endpoints and deliberately nothing more; a real client with
+retries and paging is `enterprise-mirror`'s job.
+
 ## What's in the box
 
 - **Plain language** — receipts read "You sent 250 ℏ to 0.0.8891" / "You

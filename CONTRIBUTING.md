@@ -17,6 +17,7 @@ npm run build       # emits dist/
 
 All four gates (`typecheck`, `test`, `lint`, `format:check`) run in CI on
 every push and pull request — please run them locally before opening a PR.
+Maintainers: the release runbook is [RELEASING.md](./RELEASING.md).
 
 The **examples** additionally need the optional peer packages
 (`@hiero-hackers/enterprise-mirror`, `@hiero-hackers/streams-node`) — run

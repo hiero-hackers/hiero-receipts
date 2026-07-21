@@ -7,16 +7,17 @@
  *   node examples/live-receipt.ts            # a real recent mainnet transfer
  *   node examples/live-receipt.ts 0.0.1234   # a specific account's latest
  *
- * First: `npm run build && npm run examples:setup` (built library from
- * dist/, peer packages from GitHub Packages).
+ * First: `npm run build && npm run examples:setup`. The imports use the
+ * package's real name (Node self-reference) — copy-paste-ready for your own
+ * project.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createMirrorNodeClient } from "@hiero-hackers/enterprise-mirror";
-import { receiptFor, toText, toHTML } from "../dist/index.js";
-import { fromMirror } from "../dist/adapters/mirror.js";
-import { usdPriceFromExchangeRate } from "../dist/adapters/exchange-rate.js";
+import { receiptFor, toText, toHTML } from "@hiero-hackers/hiero-receipts";
+import { fromMirror } from "@hiero-hackers/hiero-receipts/mirror";
+import { usdPriceFromExchangeRate } from "@hiero-hackers/hiero-receipts/exchange-rate";
 import { htmlToPdf } from "./render-pdf.js";
 
 const mirror = createMirrorNodeClient({ network: "mainnet" });
