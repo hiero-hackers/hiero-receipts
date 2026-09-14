@@ -95,7 +95,7 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.1.2",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.0",
     "ajv": "^8.20.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
@@ -108,6 +108,6 @@
     "typedoc": "^0.28.20",
     "typescript": "^5.5.0",
     "typescript-eslint": "^8.66.0",
-    "vitest": "^4.0.0"
+    "vitest": "^5.0.0"
   }
 }
